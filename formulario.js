@@ -5,62 +5,76 @@ document.addEventListener("DOMContentLoaded", async function () {
         return;
     }
 
-    // Mostrar el nombre del empleado en turno en la barra superior
     document.getElementById('saludoUsuario').innerText = usuario.nombre;
     document.getElementById('btnCerrarSesion').addEventListener('click', cerrarSesion);
 
     function mostrarModal(titulo, mensaje) {
-        document.getElementById('tituloModal').innerText = titulo;
-        document.getElementById('textModal').innerText = mensaje;
-        const estructuraModal = document.getElementById('modal-resumen');
-        const modalBoostrap = new bootstrap.Modal(estructuraModal);
-        modalBoostrap.show();
+        const tituloEl = document.getElementById('tituloModal');
+        const textEl = document.getElementById('textModal');
+        const modalEl = document.getElementById('modal-resumen');
+
+        if (tituloEl && textEl && modalEl) {
+            tituloEl.innerText = titulo;
+            textEl.innerText = mensaje;
+            const modalBoostrap = new bootstrap.Modal(modalEl);
+            modalBoostrap.show();
+        } else {
+            alert(`${titulo}: ${mensaje}`);
+        }
     }
 
     async function comprobrarHorario() {
         const fecha_obtenida = document.getElementById('fechaCita');
-        if (fecha_obtenida.value) {
-            const inicio_dia = 'T00:00:00-06:00';
-            const fin_dia = 'T23:59:59-06:00';
-            const fecha_requerida = fecha_obtenida.value + inicio_dia;
-            const fecha_limite = fecha_obtenida.value + fin_dia;
-            const horasServicio = ["12:00", "13:00", "14:00", "16:00", "17:00", "18:00", "19:00"];
-            let horario_ocupado = [];
-            const selectHora = document.getElementById('opciones_Horario');
+        const selectHora = document.getElementById('opciones_Horario');
 
-            const { data, error } = await _supabase
-                .from('citas')
-                .select('*')
-                .gte('fecha_hora', fecha_requerida)
-                .lte('fecha_hora', fecha_limite);
+        if (!fecha_obtenida.value) {
+            selectHora.innerHTML = '<option value="" disabled selected>Elige primero una fecha arriba</option>';
+            return;
+        }
 
-            if (error) {
-                console.error('Error al consultar disponibilidad:', error);
-                return;
-            }
+        selectHora.innerHTML = '<option value="" disabled selected>Buscando horarios disponibles...</option>';
 
-            selectHora.innerHTML = "";
-            data.forEach(cita => {
-                const horasOcupadas = new Date(cita.fecha_hora);
-                const horasOcupadas_formateadas = horasOcupadas.toLocaleTimeString('es-ES', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
-                });
-                horario_ocupado.push(horasOcupadas_formateadas);
+        const inicio_dia = 'T00:00:00-06:00';
+        const fin_dia = 'T23:59:59-06:00';
+        const fecha_requerida = fecha_obtenida.value + inicio_dia;
+        const fecha_limite = fecha_obtenida.value + fin_dia;
+        const horasServicio = ["12:00", "13:00", "14:00", "16:00", "17:00", "18:00", "19:00"];
+        let horario_ocupado = [];
+
+        const { data, error } = await _supabase
+            .from('citas')
+            .select('*')
+            .gte('fecha_hora', fecha_requerida)
+            .lte('fecha_hora', fecha_limite);
+
+        if (error) {
+            console.error('Error al consultar disponibilidad:', error);
+            selectHora.innerHTML = '<option value="" disabled selected>Error al cargar horarios</option>';
+            return;
+        }
+
+        data.forEach(cita => {
+            const horasOcupadas = new Date(cita.fecha_hora);
+            const horasOcupadas_formateadas = horasOcupadas.toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
             });
+            horario_ocupado.push(horasOcupadas_formateadas);
+        });
 
-            if (horario_ocupado.length >= horasServicio.length) {
-                mostrarModal("Agenda llena", "Todos los horarios de este día ya están ocupados.");
-            } else {
-                for (let i = 0; i < horasServicio.length; i++) {
-                    if (!horario_ocupado.includes(horasServicio[i])) {
-                        selectHora.insertAdjacentHTML('beforeend', `<option value="${horasServicio[i]}">${horasServicio[i]}</option>`);
-                    }
-                }
-            }
+        const horasLibres = horasServicio.filter(h => !horario_ocupado.includes(h));
+
+        selectHora.innerHTML = "";
+
+        if (horasLibres.length === 0) {
+            selectHora.innerHTML = '<option value="" disabled selected>Sin horarios libres para este día</option>';
+            mostrarModal("Agenda llena", "Todos los horarios de este día ya están ocupados.");
         } else {
-            mostrarModal("Error", "Selecciona primero una fecha para revisar los horarios.");
+            selectHora.insertAdjacentHTML('beforeend', '<option value="" disabled selected>Selecciona una hora disponible</option>');
+            horasLibres.forEach(hora => {
+                selectHora.insertAdjacentHTML('beforeend', `<option value="${hora}">${hora}</option>`);
+            });
         }
     }
 
@@ -73,7 +87,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         const horaValor = document.getElementById('opciones_Horario').value;
 
         if (!nombreCliente || !servicioCliente || !fecha || !horaValor) {
-            mostrarModal("Faltan datos", "Completa el nombre del cliente y selecciona una hora disponible.");
+            mostrarModal("Faltan datos", "Por favor completa el nombre del cliente y selecciona una hora válida.");
             return;
         }
 
@@ -100,11 +114,14 @@ document.addEventListener("DOMContentLoaded", async function () {
         } else {
             mostrarModal("Cita Registrada", `Cliente: ${nombreCliente} | Servicio: ${servicioCliente} | Atiende: ${usuario.nombre}`);
             document.getElementById('NombreCliente').value = "";
-            document.getElementById('opciones_Horario').innerHTML = "";
-            await refrescarCalendario();
+            document.getElementById('opciones_Horario').innerHTML = '<option value="" disabled selected>Elige primero una fecha arriba</option>';
+            document.getElementById('fechaCita').value = "";
+            if (typeof refrescarCalendario === 'function') {
+                await refrescarCalendario();
+            }
         }
     }
 
-    document.getElementById('btn-disponibilidad').addEventListener('click', comprobrarHorario);
+    document.getElementById('fechaCita').addEventListener('change', comprobrarHorario);
     document.getElementById('formAgendarCita').addEventListener('submit', enviarCita);
 });
