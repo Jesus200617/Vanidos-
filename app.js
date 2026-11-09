@@ -13,3 +13,5 @@ function cerrarSesion() {
     localStorage.removeItem('vanidoso_user');
     window.location.href = 'index.html';
 }
+
+//Por que no jala?
