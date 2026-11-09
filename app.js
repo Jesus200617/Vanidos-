@@ -11,5 +11,5 @@ function obtenerUsuarioActivo() {
 // Cerrar sesión
 function cerrarSesion() {
     localStorage.removeItem('vanidoso_user');
-    window.location.href = 'login.html';
+    window.location.href = 'index.html';
 }
