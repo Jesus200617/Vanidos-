@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", async function () {
     const usuario = obtenerUsuarioActivo();
     if (!usuario) {
-        window.location.href = 'login.html';
+        window.location.href = 'index.html';
         return;
     }
 
